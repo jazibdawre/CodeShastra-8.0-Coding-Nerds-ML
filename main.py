@@ -2,6 +2,7 @@ import os
 import json
 import dotenv
 import logging
+import uvicorn
 
 from bson import json_util, ObjectId
 from pymongo import MongoClient
@@ -109,3 +110,7 @@ async def get_all_users():
 @app.on_event("shutdown")
 def shutdown_event():
     client.close()
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=4000)
