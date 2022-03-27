@@ -3,18 +3,24 @@ import json
 import dotenv
 import logging
 import uvicorn
+import numpy as np
+import cv2
+import pytesseract
 
 from bson import json_util, ObjectId
 from pymongo import MongoClient
 from healthcheck import HealthCheck
-from fastapi import BackgroundTasks, FastAPI
-from starlette.responses import FileResponse
+from fastapi import BackgroundTasks, FastAPI, UploadFile
 
+from starlette.responses import FileResponse
 from model import extract
 
 # Initialization
 dotenv.load_dotenv("config.env")
 logging.basicConfig(level=logging.INFO)
+pytesseract.pytesseract.tesseract_cmd = (
+    r"C:\Users\jazib\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+)
 
 app = FastAPI(
     title=os.getenv("TITLE", "Zepp NLP Engine"),
@@ -32,6 +38,7 @@ client = MongoClient(
     os.getenv("MONGO_URI", "mongodb://localhost:27017")
     + "/Zepp?retryWrites=true&w=majority"
 )
+
 print("Connected to MongoDB: " + str(client))
 logging.info("Connected to MongoDB: " + str(client))
 jobs = client.get_default_database().jobs
@@ -94,6 +101,23 @@ async def submit_job(text: str, userId: str, background_tasks: BackgroundTasks):
     except Exception as e:
         logging.warning(e)
         return {"status": "error", "id": None}
+
+
+@app.post("/jobs/ocr")
+async def run_ocr(image: UploadFile):
+    """Job Submit endpoint"""
+    try:
+        contents = await image.read()
+        nparr = np.fromstring(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        custom_config = r"--oem 3 --psm 6"
+        text = pytesseract.image_to_string(img, config=custom_config)
+
+        return {"text": text}
+    except Exception as e:
+        logging.warning(e)
+        return {"status": "error", "details": e}
 
 
 @app.get("/users")
